@@ -39,17 +39,19 @@ FULL_H = 35.0
 TEST_H = 20.0
 
 # ─── Geometry adjustments ────────────────────────────────────────
-BACK_EXT      = 11.0  # cradle extends 11 mm rearward
+BACK_EXT      = 6.0   # cradle extends 6 mm rearward
+FRONT_EXT     = 5.0   # cradle extends 5 mm forward
 ARM_BACK_EXT  = 4.0   # side arms extend 4 mm rearward
+ARM_FRONT_EXT = 4.0   # side arms extend 4 mm forward (front puzzle tabs)
 PORT_XD       = 7.0   # ALL port channels +7 mm diameter
 
 # ─── Derived: body cradle ────────────────────────────────────────
 IW  = VALVE_W + 2 * CLR       # 54
 OW  = IW + 2 * WALL           # 57
 
-# Cradle outer box (extended rearward)
-CRADLE_D  = VALVE_D + 2 * CLR + 2 * WALL + BACK_EXT   # 45
-CRADLE_CY = -BACK_EXT / 2                               # -3
+# Cradle outer box (extended rearward + forward)
+CRADLE_D  = VALVE_D + 2 * CLR + 2 * WALL + BACK_EXT + FRONT_EXT  # 50
+CRADLE_CY = (-BACK_EXT + FRONT_EXT) / 2                            # -0.5
 
 # Inner cavity fills cradle with uniform 1.5 mm walls on all sides
 ID_INNER  = CRADLE_D - 2 * WALL       # 42  (bigger interior)
@@ -58,12 +60,12 @@ CAV_CY    = CRADLE_CY                 # -3  (centered with cradle)
 # ─── Derived: port channels (uniform +4 mm diameter) ────────────
 PCR   = PORT_R + CLR + PORT_XD / 2    # 13.5  all ports same radius
 ARM_R = PCR + WALL                    # 15.0  arm outer radius (all ports)
-PCZ   = BASE + VALVE_H * PORT_ZFRAC   # 15.0  port center Z
-ARM_H = PCZ                           # 15.0  arm top = port center (true half-pipe)
+PCZ   = BASE + PCR + 1.5               # 16.5  port center Z (channel bottom 1.5 mm above base top)
+ARM_H = PCZ                            # 16.5  arm top = port center (true half-pipe)
 
-# Side arm Y range: shifted rearward
-ARM_CY = -ARM_BACK_EXT / 2            # -2
-ARM_YD = 2 * ARM_R + ARM_BACK_EXT     # 34  total Y depth of side arms
+# Side arm Y range: symmetric when ARM_BACK_EXT == ARM_FRONT_EXT
+ARM_CY = -(ARM_BACK_EXT - ARM_FRONT_EXT) / 2   # 0
+ARM_YD = 2 * ARM_R + ARM_BACK_EXT + ARM_FRONT_EXT  # 38  total Y depth of side arms
 
 # ─── Derived: base footprint ────────────────────────────────────
 ARM_X = VALVE_W / 2 + PORT_LEN + CLR  # 62  half-width (side arm tip)
@@ -71,13 +73,16 @@ ARM_Y = VALVE_D / 2 + PORT_LEN + CLR  # 53  front arm tip Y
 BK_Y  = -(CRADLE_D / 2 + abs(CRADLE_CY))  # -25.5
 FR_Y  = ARM_Y                              # 53
 
-# ─── Puzzle-piece connector (on rear arm wall, outside channel) ─
+# ─── Puzzle-piece connectors (rear + front, reversed for 180° mating) ─
 PZ_R   = 6.0    # knob radius
-PZ_H   = 5.0    # knob height (solid arm zone behind channel)
+PZ_H   = 5.0    # knob height (solid arm zone beside channel)
 PZ_TOL = 0.2    # fit clearance
-# Center of rear arm wall (between channel back edge and arm back edge)
-_arm_back = ARM_CY - ARM_YD / 2       # -20.5
-PZ_Y = (_arm_back + (-PCR)) / 2       # -17.75
+# Rear tabs: center between channel back edge and arm back edge
+_arm_back  = ARM_CY - ARM_YD / 2      # -19
+PZ_Y       = (_arm_back + (-PCR)) / 2 # -16.25
+# Front tabs: center between channel front edge and arm front edge
+_arm_front = ARM_CY + ARM_YD / 2      # +19
+PZ_Y_FRONT = (_arm_front + PCR) / 2   # +16.25  (== -PZ_Y)
 
 OVL = 0.1      # boolean overlap
 
@@ -168,22 +173,24 @@ def make_bracket(h):
 
     # ── 3. Semi-circular channels (half-pipe, open top for drop-in) ─
     # Side ports — cylinder for curved bottom half
-    b -= cq_cyl_x(0, PCZ, PCR, -(ARM_X + 1), ARM_X + 1)
+    b -= cq_cyl_x(0, PCZ, PCR, -(ARM_X+1), ARM_X+1)
     # Side ports — rect slot above port center (opens top half)
     b -= cq_box(0, 0, PCZ,
-                 2 * (ARM_X + 1), 2 * PCR, h - PCZ + 0.1)
+                 2*(ARM_X+1), 2*PCR, slot_h)
 
     # Front port — cylinder for curved bottom half
-    b -= cq_cyl_y(0, PCZ, PCR, 0, ARM_Y + 1)
+    b -= cq_cyl_y(0, PCZ, PCR, 0, ARM_Y+1)
     # Front port — rect slot above port center (opens top half)
-    b -= cq_box(0, (ARM_Y + 1) / 2, PCZ,
-                 2 * PCR, ARM_Y + 1, h - PCZ + 0.1)
+    b -= cq_box(0, (ARM_Y+1)/2, PCZ,
+                 2*PCR, ARM_Y+1, slot_h)
 
-    # ── 5. puzzle-piece connector (rear arm wall, outside channel) ─
-    # right side: knob (add)
+    # ── 5. puzzle-piece connectors (rear + front, reversed for 180° mating) ─
+    # Rear: right=knob, left=indent
     b += cq_cyl_z(ARM_X, PZ_Y, PZ_R, 0, PZ_H)
-    # left side: indent (subtract)
     b -= cq_cyl_z(-ARM_X, PZ_Y, PZ_R + PZ_TOL, -0.1, PZ_H + 0.2)
+    # Front: right=indent, left=knob (reversed so flipped bracket still mates)
+    b -= cq_cyl_z(ARM_X, PZ_Y_FRONT, PZ_R + PZ_TOL, -0.1, PZ_H + 0.2)
+    b += cq_cyl_z(-ARM_X, PZ_Y_FRONT, PZ_R, 0, PZ_H)
 
     # ── 6. embossed arrows on cavity floor (visible from top) ──
     # Positioned behind the valve body (Y=-22), clear of port channels

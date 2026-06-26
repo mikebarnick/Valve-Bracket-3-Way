@@ -44,6 +44,7 @@ FRONT_EXT     = 5.0   # cradle extends 5 mm forward
 ARM_BACK_EXT  = 4.0   # side arms extend 4 mm rearward
 ARM_FRONT_EXT = 4.0   # side arms extend 4 mm forward (front puzzle tabs)
 PORT_XD       = 7.0   # ALL port channels +7 mm diameter
+SIDE_EXT      = 10.0  # side (X) arms + base extend 10 mm beyond port tip each side
 
 # ─── Derived: body cradle ────────────────────────────────────────
 IW  = VALVE_W + 2 * CLR       # 54
@@ -68,14 +69,25 @@ ARM_CY = -(ARM_BACK_EXT - ARM_FRONT_EXT) / 2   # 0
 ARM_YD = 2 * ARM_R + ARM_BACK_EXT + ARM_FRONT_EXT  # 38  total Y depth of side arms
 
 # ─── Derived: base footprint ────────────────────────────────────
-ARM_X = VALVE_W / 2 + PORT_LEN + CLR  # 62  half-width (side arm tip)
+ARM_X = VALVE_W / 2 + PORT_LEN + CLR + SIDE_EXT  # 72  half-width (side arm tip)
 ARM_Y = VALVE_D / 2 + PORT_LEN + CLR  # 53  front arm tip Y
 BK_Y  = -(CRADLE_D / 2 + abs(CRADLE_CY))  # -25.5
 FR_Y  = ARM_Y                              # 53
 
+# ─── Corner bracket (wraps a cube's front-left corner) ──────────
+CB_W     = 25.4   # base width along X (1"), mate edge → left edge
+CB_T     = 3.0    # flange / wall thickness
+WALL_H   = 28.0   # cube-mount wall height (Z)
+RIB_W    = 12.0   # mate-edge rib width (X) — hosts tab + notch
+RIB_H    = 3.0    # mate-edge rib height (Z) — just backs the 3 mm notch (= PZ_H)
+FB_LEN   = 28.0   # left wall length along Y
+CSK_D    = 4.0    # countersunk screw clearance dia (sheet-metal)
+CSK_HEAD = 8.0    # countersink head dia
+CSK_DEP  = 2.3    # countersink depth
+
 # ─── Puzzle-piece connectors (rear + front, reversed for 180° mating) ─
 PZ_R   = 6.0    # knob radius
-PZ_H   = 5.0    # knob height (solid arm zone beside channel)
+PZ_H   = 3.0    # knob/notch height (keep == RIB_H)
 PZ_TOL = 0.2    # fit clearance
 # Rear tabs: center between channel back edge and arm back edge
 _arm_back  = ARM_CY - ARM_YD / 2      # -19
@@ -110,6 +122,16 @@ def cq_cyl_z(x, y, r, z0, z1):
     """Cylinder along Z at (x, y)."""
     return (cq.Workplane("XY").workplane(offset=min(z0, z1))
             .center(x, y).circle(r).extrude(abs(z1 - z0)))
+
+def csk_cutter(pnt, dir_vec, r_hole, r_head, csk_dep, thru):
+    """Countersunk-hole cutter: through-cylinder + conical head recess.
+    Drills from surface `pnt` along `dir_vec`; head recess opens at the
+    surface (flush flat-head screw). Returns a Solid for .cut()."""
+    surf = cq.Vector(*pnt)
+    d    = cq.Vector(*dir_vec)
+    cyl  = cq.Solid.makeCylinder(r_hole, thru, surf.sub(d.multiply(0.1)), d)
+    cone = cq.Solid.makeCone(r_head, r_hole, csk_dep, surf, d)
+    return cyl.fuse(cone)
 
 
 # ─── embossed arrow helper ───────────────────────────────────────
@@ -149,8 +171,10 @@ def make_bracket(h):
     sa_len   = ARM_X - sa_start
     fa_start = CRADLE_CY + CRADLE_D / 2 - OVL  # cradle front edge
     fa_len   = ARM_Y - fa_start
-    base_d   = FR_Y - BK_Y
-    base_cy  = (BK_Y + FR_Y) / 2
+    # base plate symmetric about Y=0 (the tab centerline) so a 180°-flipped
+    # bracket keeps the same footprint — alternating bases form one long edge
+    base_d   = 2 * ARM_Y    # 106  (back extended to match the front +53)
+    base_cy  = 0.0
 
     # ── 1. solid volumes ─────────────────────────────────────
     # body cradle (extended rearward)
@@ -202,6 +226,59 @@ def make_bracket(h):
     return b
 
 
+# ─── corner bracket (L-bracket) ──────────────────────────────────
+
+def make_corner_bracket():
+    """Corner bracket wrapping a cube's front-left vertical corner.
+
+    A flat base (like the main bracket) mates to the valve bracket's
+    LEFT edge with the puzzle tab + notch. Two upright walls form an L
+    in plan view:
+      • front wall — runs along X, bolts to the cube's FRONT (-Y) face
+        (this is the part the base attaches to)
+      • left wall  — runs along Y, no base, bolts to the cube's LEFT
+        (-X) face
+    Each wall has two 4 mm countersunk holes for sheet-metal screws.
+    The cube sits behind in +Y; its front-left corner is at (x_lf, y_cf).
+    Returned in world coords registered to the bracket's left side.
+    """
+    x_mate = -ARM_X              # -62.0  mate edge (= valve left edge)
+    x_lf   = x_mate - CB_W       # -87.4  cube left face / base left edge
+    x_out  = x_lf - CB_T         # -90.4  outer face of left wall
+    y_cf   =  ARM_Y             # +53.0  front wall — flush w/ valve base front edge
+    y_bk   = -ARM_Y             # -53.0  base back edge — flush w/ valve base back edge
+    y_b0   = y_cf - CB_T        # +50.0  inner face of front wall
+    y_b1   = y_b0 + FB_LEN      # +78.0  far end of left wall
+
+    # base plate — extends from the mate rib forward to the front wall
+    c  = cq_box((x_lf + x_mate) / 2, (y_bk + y_cf) / 2, 0,
+                CB_W, y_cf - y_bk, BASE)
+    # mate-edge rib — gives the tab + notch real depth
+    c += cq_box(x_mate - RIB_W / 2, 0, 0, RIB_W, ARM_YD, RIB_H)
+    # front wall (runs along X) — bolts to cube front face
+    c += cq_box((x_out + x_mate) / 2, y_cf - CB_T / 2, 0,
+                x_mate - x_out, CB_T, WALL_H)
+    # left wall (runs along Y, no base) — bolts to cube left face
+    c += cq_box((x_out + x_lf) / 2, (y_b0 + y_b1) / 2, 0,
+                CB_T, FB_LEN, WALL_H)
+
+    # puzzle connector mirroring the valve's left edge:
+    #   rear = knob (fills valve's indent), front = notch (takes valve's knob)
+    c += cq_cyl_z(x_mate, PZ_Y, PZ_R, 0, PZ_H)
+    c -= cq_cyl_z(x_mate, PZ_Y_FRONT, PZ_R + PZ_TOL, -0.1, PZ_H + 0.2)
+
+    rh, hh = CSK_D / 2, CSK_HEAD / 2
+    # front-wall screws (drill +Y into cube front face)
+    for xc in (x_out + 5.0, x_mate - 5.0):
+        c = c.cut(csk_cutter((xc, y_b0, WALL_H / 2), (0, 1, 0),
+                             rh, hh, CSK_DEP, CB_T + 3.0))
+    # left-wall screws (drill +X into cube left face)
+    for yc in (y_b0 + 6.0, y_b1 - 6.0):
+        c = c.cut(csk_cutter((x_out, yc, WALL_H / 2), (1, 0, 0),
+                             rh, hh, CSK_DEP, CB_T + 3.0))
+    return c
+
+
 # ─── valve reference model ───────────────────────────────────────
 
 def make_valve():
@@ -227,11 +304,12 @@ def tess(shape, tol=0.5):
     return out
 
 
-def render_png(bracket, valve, path):
+def render_png(bracket, valve, corner, path):
     fig = plt.figure(figsize=(16, 10))
     fig.patch.set_facecolor("white")
 
     bt = tess(bracket, 0.3)
+    ct = tess(corner, 0.3)
     vt = [tri + [0, 0, BASE] for tri in tess(valve, 0.5)]
 
     views = [
@@ -245,11 +323,14 @@ def render_png(bracket, valve, path):
         ax.add_collection3d(Poly3DCollection(
             bt, alpha=0.85, facecolor="#4a90d9",
             edgecolor="#2c5f8a", linewidth=0.12))
+        ax.add_collection3d(Poly3DCollection(
+            ct, alpha=0.9, facecolor="#5cb85c",
+            edgecolor="#2f6f2f", linewidth=0.12))
         if show_valve:
             ax.add_collection3d(Poly3DCollection(
                 vt, alpha=0.22, facecolor="#d4a94a",
                 edgecolor="#8a7030", linewidth=0.08))
-        pts = np.vstack(bt + vt)
+        pts = np.vstack(bt + ct + vt)
         pad = 10
         ax.set_xlim(pts[:, 0].min() - pad, pts[:, 0].max() + pad)
         ax.set_ylim(pts[:, 1].min() - pad, pts[:, 1].max() + pad)
@@ -271,21 +352,24 @@ def main():
 
     bracket = make_bracket(FULL_H)
     test    = make_bracket(TEST_H)
+    corner  = make_corner_bracket()
     valve   = make_valve()
-    asm     = bracket + valve.translate((0, 0, BASE))
+    asm     = bracket + corner + valve.translate((0, 0, BASE))
 
     exports = [
         ("bracket.stl",           bracket),
         ("bracket.step",          bracket),
         ("bracket_test.stl",      test),
         ("bracket_test.step",     test),
+        ("corner_bracket.stl",    corner),
+        ("corner_bracket.step",   corner),
         ("bracket_assembly.step", asm),
     ]
     for name, shape in exports:
         cq.exporters.export(shape, os.path.join(DIR, name))
         print(f"  {name}")
 
-    render_png(bracket, valve, os.path.join(DIR, "bracket_assembly.png"))
+    render_png(bracket, valve, corner, os.path.join(DIR, "bracket_assembly.png"))
     print("  bracket_assembly.png")
     print("Done.")
 

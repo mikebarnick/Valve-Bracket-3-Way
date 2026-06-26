@@ -36,8 +36,15 @@ See `Sample pics/` folder:
 - Front/side walls: keyhole cutouts (semi-circular + slot to top)
 - Half-pipe arms along all 3 ports from body to barb tip (~210° wrap)
 - Base spans full assembly width (130 mm inc. tabs) for stability
-- Puzzle-tab interlocking on body-cradle zone of side edges
-  (4-segment alternating tab/slot, symmetric under 180° rotation)
+- Base is symmetric about the tab centerline (Y=0), ±53 mm front/back,
+  so 180°-flipped brackets keep the same footprint — a row of
+  alternating brackets forms one continuous straight base edge
+- Puzzle-tab interlocking on side arm edges, front + rear pairs
+  (reversed polarity so brackets mate even when one is flipped 180°)
+- Corner bracket (separate part) wraps a cube's front-left corner:
+  flat base mates to the valve bracket's LEFT edge via the puzzle
+  tab/notch; two upright walls (front along X, left along Y) bolt to
+  the cube's faces. Each wall has two 4 mm countersunk screw holes.
 
 ## Coordinate System
 - X axis: left-right (width)
@@ -50,24 +57,44 @@ See `Sample pics/` folder:
 - `bracket.stl` — full bracket, for Luban / 3D printing
 - `bracket_test.step` — test bracket (20 mm), for Fusion 360
 - `bracket_test.stl` — test bracket, for Luban / 3D printing
-- `bracket_assembly.step` — bracket + valve reference (fit-check)
+- `corner_bracket.step` — 1" L-bracket (box-face mount), for Fusion 360
+- `corner_bracket.stl` — corner bracket, for Luban / 3D printing
+- `bracket_assembly.step` — bracket + corner bracket + valve reference (fit-check)
 - `bracket_assembly.png` — 3D visualization (two-angle view)
 
 ## Build
 ```
-python3 bracket_gen.py
+/usr/bin/python3 bracket_gen.py
 ```
-Requires: cadquery, matplotlib, numpy
+Requires: cadquery, matplotlib, numpy — installed only under macOS system
+Python 3.9.6 (`/usr/bin/python3`), NOT the default `python3` on PATH.
 
 ## Design Notes
 - Wall/floor thickness: 1.5 mm
-- Body cradle: 54 mm W x 36 mm D inner (57 x 39 outer)
-- Base footprint: 130 mm W x 72.5 mm D (wide for port arms + tabs)
-- Port channels: semi-circular (R=11.5 mm clearance, R=13 mm outer)
+- Body cradle: 54 mm W inner (57 outer), extended 6 mm rear + 5 mm front
+- Base footprint: ~144 mm W x 106 mm D (Y symmetric ±53 about tab line)
+- SIDE_EXT = 10 mm: side (X) arms + base extend 10 mm beyond port tip
+  each side (half-width ARM_X = 72; round side channels extend with them)
+- Port channels: semi-circular (R=13.5 mm clearance, R=15 mm outer)
   Arms extend from cradle wall to barb tip, open top for drop-in
-- Port center height: Z = 15 mm; arm top: Z = 17 mm
+- Port center height: Z = 16.5 mm (channel bottom 1.5 mm above base top)
+- Arm top: Z = 16.5 mm (true half-pipe)
 - Back wall solid; front + L/R have keyhole cutouts (circle + slot)
-- Puzzle tabs: 3 mm protrusion, 0.2 mm tolerance, 4 segments per side
-  Located on body-cradle zone only (Y = ±19.5 mm) so rotation works
-- Uses `cq_box()`, `cq_cyl_x()`, `cq_cyl_y()` helpers
-- Generates STEP, STL, assembly STEP, and 3-view PNG in one script
+- Puzzle tabs: R=6 mm knob, 3 mm high, 0.2 mm tolerance, rear + front pairs per side
+  Rear: right=knob, left=indent; Front: reversed (right=indent, left=knob)
+  Symmetric at Y = ±16.25 mm so 180° rotated brackets still mate
+- Side arms symmetric (4 mm extension front + back) for tab backing
+- Corner bracket (`make_corner_bracket`): wraps a cube's front-left
+  vertical corner. Flat base (1" / 25.4 mm wide along X) mates to the
+  valve bracket's left edge (X = -72) via the puzzle tab + notch
+  (mirrored: rear knob, front notch), backed by a low rib (RIB_W = 12 mm,
+  height = 3 mm = tab height) for notch depth. Base spans Y = -53 to +53 (flush
+  with both valve base edges); front wall sits on the +53 edge. Two
+  upright walls, 3 mm thick, WALL_H = 28 mm:
+  FRONT wall (along X, at Y = +53) bolts to the cube front face; LEFT
+  wall (along Y, X = -97.4, no base) bolts to the cube left face. Each
+  wall has two 4 mm countersunk holes (CSK_HEAD = 8 mm) for sheet-metal
+  screws. Cube assumed behind in +Y
+- Countersink cutter helper `csk_cutter()` (through-hole + cone recess)
+- Uses `cq_box()`, `cq_cyl_x()`, `cq_cyl_y()`, `cq_cyl_z()` helpers
+- Generates STEP, STL (bracket, test, corner), assembly STEP, 4-view PNG

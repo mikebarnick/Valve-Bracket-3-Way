@@ -34,9 +34,10 @@ See `Sample pics/` folder:
 - Full bracket: 35 mm tall; test bracket: 20 mm tall
 - Back wall: SOLID (no opening)
 - Front/side walls: keyhole cutouts (semi-circular + slot to top)
-- Half-pipe arms along all 3 ports from body to barb tip (~210° wrap)
+- Front port: half-pipe arm from body to barb tip; side ports:
+  quarter-pipe arms (rear/−Y half removed, open to the rear)
 - Base spans full assembly width (130 mm inc. tabs) for stability
-- Base is symmetric about the tab centerline (Y=0), ±53 mm front/back,
+- Base is symmetric about the tab centerline (Y=0), ±65.5 mm front/back,
   so 180°-flipped brackets keep the same footprint — a row of
   alternating brackets forms one continuous straight base edge
 - Puzzle-tab interlocking on side arm edges, front + rear pairs
@@ -72,7 +73,8 @@ Python 3.9.6 (`/usr/bin/python3`), NOT the default `python3` on PATH.
 ## Design Notes
 - Wall/floor thickness: 1.5 mm
 - Body cradle: 54 mm W inner (57 outer), extended 6 mm rear + 5 mm front
-- Base footprint: ~144 mm W x 106 mm D (Y symmetric ±53 about tab line)
+- Base footprint: ~144 mm W x 131 mm D (Y symmetric ±65.5 about tab
+  line; BASE_Y_EXT = 25 mm total lengthening)
 - SIDE_EXT = 10 mm: side (X) arms + base extend 10 mm beyond port tip
   each side (half-width ARM_X = 72; round side channels extend with them)
 - Port channels: semi-circular (R=13.5 mm clearance, R=15 mm outer)
@@ -83,13 +85,15 @@ Python 3.9.6 (`/usr/bin/python3`), NOT the default `python3` on PATH.
 - Puzzle tabs: R=6 mm knob, 3 mm high, 0.2 mm tolerance, rear + front pairs per side
   Rear: right=knob, left=indent; Front: reversed (right=indent, left=knob)
   Symmetric at Y = ±16.25 mm so 180° rotated brackets still mate
-- Side arms symmetric (4 mm extension front + back) for tab backing
+- Side arms span Y = 0 to +19 only (rear/−Y half removed → quarter-pipe
+  channels open to the rear); rear knobs sit on the base plate alone,
+  rear notches cut through the base edge
 - Corner bracket (`make_corner_bracket`): wraps a cube's front-left
   vertical corner. Flat base (1" / 25.4 mm wide along X) mates to the
   valve bracket's left edge (X = -72) via the puzzle tab + notch
   (mirrored: rear knob, front notch), backed by a low rib (RIB_W = 12 mm,
-  height = 3 mm = tab height) for notch depth. Base spans Y = -53 to +53 (flush
-  with both valve base edges); front wall sits on the +53 edge. Two
+  height = 3 mm = tab height) for notch depth. Base spans Y = -65.5 to +65.5
+  (flush with both valve base edges); front wall sits on the +65.5 edge. Two
   upright walls, 3 mm thick, WALL_H = 28 mm:
   FRONT wall (along X, at Y = +53) bolts to the cube front face; LEFT
   wall (along Y, X = -97.4, no base) bolts to the cube left face. Each

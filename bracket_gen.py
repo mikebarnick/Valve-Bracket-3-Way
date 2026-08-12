@@ -45,6 +45,7 @@ ARM_BACK_EXT  = 4.0   # side arms extend 4 mm rearward
 ARM_FRONT_EXT = 4.0   # side arms extend 4 mm forward (front puzzle tabs)
 PORT_XD       = 7.0   # ALL port channels +7 mm diameter
 SIDE_EXT      = 10.0  # side (X) arms + base extend 10 mm beyond port tip each side
+BASE_Y_EXT    = 25.0  # base lengthened 25 mm total in Y (±12.5, stays symmetric)
 
 # ─── Derived: body cradle ────────────────────────────────────────
 IW  = VALVE_W + 2 * CLR       # 54
@@ -73,6 +74,7 @@ ARM_X = VALVE_W / 2 + PORT_LEN + CLR + SIDE_EXT  # 72  half-width (side arm tip)
 ARM_Y = VALVE_D / 2 + PORT_LEN + CLR  # 53  front arm tip Y
 BK_Y  = -(CRADLE_D / 2 + abs(CRADLE_CY))  # -25.5
 FR_Y  = ARM_Y                              # 53
+BASE_HD = ARM_Y + BASE_Y_EXT / 2           # 65.5  base half-depth (symmetric about Y=0)
 
 # ─── Corner bracket (wraps a cube's front-left corner) ──────────
 CB_W     = 25.4   # base width along X (1"), mate edge → left edge
@@ -173,7 +175,7 @@ def make_bracket(h):
     fa_len   = ARM_Y - fa_start
     # base plate symmetric about Y=0 (the tab centerline) so a 180°-flipped
     # bracket keeps the same footprint — alternating bases form one long edge
-    base_d   = 2 * ARM_Y    # 106  (back extended to match the front +53)
+    base_d   = 2 * BASE_HD  # 131
     base_cy  = 0.0
 
     # ── 1. solid volumes ─────────────────────────────────────
@@ -183,10 +185,11 @@ def make_bracket(h):
     # base plate (full width + front arm)
     b += cq_box(0, base_cy, 0, 2 * ARM_X, base_d, BASE)
 
-    # side arm blocks (extended rearward by ARM_BACK_EXT)
+    # side arm blocks — rear (-Y) half removed: quarter-pipe open to the rear
+    arm_front = ARM_CY + ARM_YD / 2   # +19
     for s in (1, -1):
-        b += cq_box(s * (sa_start + sa_len / 2), ARM_CY, 0,
-                     sa_len, ARM_YD, ARM_H)
+        b += cq_box(s * (sa_start + sa_len / 2), arm_front / 2, 0,
+                     sa_len, arm_front, ARM_H)
 
     # front arm block (same width as side arms)
     b += cq_box(0, fa_start + fa_len / 2, 0,
@@ -245,10 +248,10 @@ def make_corner_bracket():
     x_mate = -ARM_X              # -62.0  mate edge (= valve left edge)
     x_lf   = x_mate - CB_W       # -87.4  cube left face / base left edge
     x_out  = x_lf - CB_T         # -90.4  outer face of left wall
-    y_cf   =  ARM_Y             # +53.0  front wall — flush w/ valve base front edge
-    y_bk   = -ARM_Y             # -53.0  base back edge — flush w/ valve base back edge
-    y_b0   = y_cf - CB_T        # +50.0  inner face of front wall
-    y_b1   = y_b0 + FB_LEN      # +78.0  far end of left wall
+    y_cf   =  BASE_HD           # +65.5  front wall — flush w/ valve base front edge
+    y_bk   = -BASE_HD           # -65.5  base back edge — flush w/ valve base back edge
+    y_b0   = y_cf - CB_T        # +62.5  inner face of front wall
+    y_b1   = y_b0 + FB_LEN      # +90.5  far end of left wall
 
     # base plate — extends from the mate rib forward to the front wall
     c  = cq_box((x_lf + x_mate) / 2, (y_bk + y_cf) / 2, 0,
@@ -312,17 +315,27 @@ def render_png(bracket, valve, corner, path):
     ct = tess(corner, 0.3)
     vt = [tri + [0, 0, BASE] for tri in tess(valve, 0.5)]
 
+    # height-shaded colors for the true top view (darker = taller)
+    zmax = max(tri[:, 2].max() for tri in bt)
+    cmap = plt.get_cmap("Blues")
+    bt_shaded = [cmap(0.25 + 0.65 * tri[:, 2].mean() / zmax) for tri in bt]
+
     views = [
-        (25, -50, "Front-left", True),
-        (25,  50, "Front-right", True),
-        (75, -90, "Top (bracket only)", False),   # no valve, arrows visible
-        (75,   0, "Top (assembly)", True),
+        (25, -50, "Front-left", True, False),
+        (25,  50, "Front-right", True, False),
+        (90, -90, "Top (bracket only)", False, True),  # true ortho top, no valve
+        (75,   0, "Top (assembly)", True, False),
     ]
-    for idx, (elev, azim, label, show_valve) in enumerate(views):
+    for idx, (elev, azim, label, show_valve, ortho_top) in enumerate(views):
         ax = fig.add_subplot(2, 2, idx + 1, projection="3d")
-        ax.add_collection3d(Poly3DCollection(
-            bt, alpha=0.85, facecolor="#4a90d9",
-            edgecolor="#2c5f8a", linewidth=0.12))
+        if ortho_top:
+            ax.add_collection3d(Poly3DCollection(
+                bt, facecolors=bt_shaded,
+                edgecolor="#1f3f5f", linewidth=0.1))
+        else:
+            ax.add_collection3d(Poly3DCollection(
+                bt, alpha=0.85, facecolor="#4a90d9",
+                edgecolor="#2c5f8a", linewidth=0.12))
         ax.add_collection3d(Poly3DCollection(
             ct, alpha=0.9, facecolor="#5cb85c",
             edgecolor="#2f6f2f", linewidth=0.12))
@@ -332,12 +345,20 @@ def render_png(bracket, valve, corner, path):
                 edgecolor="#8a7030", linewidth=0.08))
         pts = np.vstack(bt + ct + vt)
         pad = 10
-        ax.set_xlim(pts[:, 0].min() - pad, pts[:, 0].max() + pad)
-        ax.set_ylim(pts[:, 1].min() - pad, pts[:, 1].max() + pad)
+        xr = (pts[:, 0].min() - pad, pts[:, 0].max() + pad)
+        yr = (pts[:, 1].min() - pad, pts[:, 1].max() + pad)
+        ax.set_xlim(*xr)
+        ax.set_ylim(*yr)
         ax.set_zlim(pts[:, 2].min() - 2,   pts[:, 2].max() + pad)
+        if ortho_top:
+            ax.set_proj_type("ortho")
+            ax.set_box_aspect((xr[1] - xr[0], yr[1] - yr[0], 40))
+            ax.set_zticks([])
         ax.view_init(elev=elev, azim=azim)
         ax.set_title(label, fontsize=10)
-        ax.set_xlabel("X mm"); ax.set_ylabel("Y mm"); ax.set_zlabel("Z mm")
+        ax.set_xlabel("X mm"); ax.set_ylabel("Y mm")
+        if not ortho_top:
+            ax.set_zlabel("Z mm")
 
     plt.suptitle("Valve Bracket 3-Way — Assembly", fontsize=13)
     plt.tight_layout()
